@@ -19,6 +19,7 @@ import {
     getSessionDuration,
     getTokenMetrics
 } from './utils/jsonl';
+import { getCachedUsage } from './utils/oauth-usage';
 import {
     calculateMaxWidthsFromPreRendered,
     preRenderAllWidgets,
@@ -100,7 +101,23 @@ async function renderMultipleLines(data: StatusJSON) {
 
     let blockMetrics: BlockMetrics | null = null;
     if (hasBlockTimer) {
-        blockMetrics = getCachedBlockMetrics();
+        const usage = getCachedUsage();
+        if (usage) {
+            const resetsAt = new Date(usage.resetsAt);
+            const sessionDurationMs = 5 * 60 * 60 * 1000;
+            blockMetrics = {
+                startTime: new Date(resetsAt.getTime() - sessionDurationMs),
+                lastActivity: new Date(),
+                utilization: usage.utilization,
+                resetsAt,
+                source: 'api'
+            };
+        } else {
+            const transcriptMetrics = getCachedBlockMetrics();
+            if (transcriptMetrics) {
+                blockMetrics = { ...transcriptMetrics, source: 'transcript' };
+            }
+        }
     }
 
     // Create render context
